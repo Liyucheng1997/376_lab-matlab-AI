@@ -29,6 +29,19 @@ node server.js
 | 文件 | 浏览器本地虚拟文件夹：`save load csvread csvwrite readmatrix writematrix fopen fprintf fgetl fclose`，可导入/下载本地文件 |
 | 界面 | 编辑器（语法高亮、自动缩进、`%%` 分节运行）、命令行窗口（历史、Tab 补全）、工作区、当前文件夹、多图窗（三维拖动旋转、导出 PNG）、函数参考、**公式库**（代数、几何、微积分、线性代数、微分方程、统计、物理、金融、信号处理等 80 余条可运行公式）、深色主题 |
 
+## AI 助手（Claude）
+
+右侧“AI 助手”面板接入了 Anthropic 的 Claude。点击设置按钮填写你自己的 [Anthropic API Key](https://console.anthropic.com/settings/keys) 后，就可以用自然语言让 AI 完成 MATLAB 任务：求解方程、画图、写脚本和函数、调试报错、解释代码。
+
+- **AI 会直接操作 MatWeb**：在你的工作区运行代码并读取输出、查看变量、读取编辑器和文件、把脚本或函数写入当前文件夹并在编辑器中打开、截取图窗检查图像、检索本环境支持的函数。
+- **命令行出错时**会出现“让 AI 助手解释并修复这个错误”的入口。
+- **可选模型**：Claude Opus 5.5（默认）、Sonnet 5.5、Haiku 5.5、Fable 5.1；思考强度可选低/中/高。
+- **安全与费用**：API Key 只保存在你的浏览器中（可选择关闭页面后清除），请求从浏览器直接发送到 Anthropic，不经过任何其它服务器；调用费用由你的 Anthropic 账户承担。设置中可关闭“允许 AI 直接运行代码”，改为每次运行前确认。
+- 无法直接访问 `api.anthropic.com` 时，可在设置中填写兼容 Anthropic API 的地址。
+- 使用官方地址时开启了服务端回退（`fallbacks: "default"`）：如果所选模型因安全策略拒绝请求，会自动改由 Anthropic 推荐的模型继续回答。
+
+实现上使用官方 SDK `@anthropic-ai/sdk`（首次使用时从 jsDelivr 按需加载，固定版本 0.133.0），流式输出、自适应思考、提示缓存与工具调用循环都在浏览器内完成，见 `js/ui/ai.js`。
+
 ## 快捷键
 
 | 位置 | 按键 | 作用 |

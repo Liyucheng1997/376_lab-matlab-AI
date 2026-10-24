@@ -125,6 +125,8 @@
       this.pump();
     }
     interrupt() {
+      // 排队中的任务直接取消（带回调的任务需要通知调用方）
+      for (const job of this.queue) if (job.meta.onDone) job.meta.onDone({ output: '', error: true, cancelled: true, figures: [], elapsed: 0 });
       this.queue = [];
       if (!this.busy) return;
       if (this.mode === 'worker') {
@@ -136,7 +138,8 @@
           this.worker.terminate();
           this.busy = false;
           this.h.onWarn('已强制终止计算引擎，工作区已重置（通过 node server.js 启动可保留工作区）。\n');
-          this.h.onBusy(false, {}, 0);
+          const job = this.current; this.current = null;
+          this.h.onBusy(false, job ? job.meta : {}, 0);
           this.h.onWorkspace([]);
           this.start(this.files);
         }

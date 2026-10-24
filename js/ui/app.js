@@ -87,7 +87,17 @@
     exec(code, echoText) {
       if (echoText !== null) this.echo(echoText !== undefined ? echoText : code);
       if (!code.trim()) return;
-      engine.run(code, { source: 'console' });
+      engine.run(code, { source: 'console', code });
+    },
+    // 在输出中插入一个可点击的操作
+    action(label, onClick) {
+      const a = el('span', 'action', label);
+      a.dataset.cls = 'action';
+      a.addEventListener('click', onClick);
+      this.out.appendChild(a);
+      this.out.appendChild(document.createTextNode('\n'));
+      this.nodes += 2;
+      this.scroll();
     },
     startInput(prompt) {
       this.inputMode = true;
@@ -466,7 +476,7 @@
         document.querySelectorAll('.tool-pane').forEach((p) => p.classList.toggle('active', p.id === 'tool-' + t.dataset.tool));
         store.set('tool', t.dataset.tool);
       }));
-      const last = store.get('tool', 'formulas');
+      const last = store.get('tool', 'ai');
       const tab = document.querySelector('#toolTabs .tab[data-tool="' + last + '"]'); if (tab) tab.click();
       $('#formulaSearch').addEventListener('input', () => this.renderFormulas());
       $('#funcSearch').addEventListener('input', () => this.renderFunctions());
@@ -598,6 +608,7 @@
 
   // ======================= 引擎 =======================
   let lastErr = '';
+  let capture = null; // AI 助手运行代码时收集输出
   const engine = new ML.EngineClient({
     onReady(info) {
       const m = info.mode === 'worker' ? '后台引擎 (Web Worker)' + (info.hasInput ? ' · 支持中断与 input' : '') : '主线程模式';
@@ -608,11 +619,11 @@
       }
       status('就绪', 'ok');
     },
-    onOut: (t) => Console.append(t, 'out'),
-    onErr: (t) => { lastErr += t; Console.append(t, 'err'); },
-    onWarn: (t) => Console.append(t, 'warn'),
+    onOut: (t) => { Console.append(t, 'out'); if (capture) capture.text += t; },
+    onErr: (t) => { lastErr += t; Console.append(t, 'err'); if (capture) capture.text += t; },
+    onWarn: (t) => { Console.append(t, 'warn'); if (capture) capture.text += t; },
     onClc: () => Console.clear(),
-    onFigure: (fig, cur) => Figures.update(fig, cur),
+    onFigure: (fig, cur) => { Figures.update(fig, cur); if (capture) capture.figs.add(fig.id); },
     onCloseFigure: (id) => Figures.close(id),
     onWorkspace: (vars) => Workspace.render(vars),
     onSaveFile: (name, content) => { FS.write(name, content); Files.render(); Editor.fileChanged(name, content); },
@@ -627,7 +638,14 @@
     onBusy(busy, meta, elapsed) {
       $('#btnStop').disabled = !busy;
       $('#busyIndicator').hidden = !busy;
-      if (busy) { lastErr = ''; status('正在运行…', 'run'); return; }
+      if (busy) { lastErr = ''; capture = meta.capture ? { text: '', figs: new Set() } : null; status('正在运行…', 'run'); return; }
+      const cap = capture; capture = null;
+      if (meta.onDone) meta.onDone({ output: cap ? cap.text : '', error: !!lastErr, figures: cap ? [...cap.figs] : [], elapsed });
+      // 命令行出错时提供“让 AI 修复”的入口
+      if (lastErr && meta.source === 'console' && meta.code && ML.AI) {
+        const code = meta.code, errText = lastErr;
+        Console.action('让 AI 助手解释并修复这个错误', () => ML.AI.ask('我在命令行运行了下面的代码，出现了错误。请解释原因并给出修复后的代码（可以直接运行验证）。\n\n```matlab\n' + code + '\n```\n\n错误信息：\n```\n' + errText.trim() + '\n```'));
+      }
       if (Console.inputMode) { Console.inputMode = false; $('#prompt').textContent = '>>'; $('#prompt').classList.remove('input-mode'); }
       // 定位错误行
       if (lastErr && runningFile && Editor.doc() && Editor.doc().name === runningFile.name) {
@@ -794,6 +812,17 @@ plot(t, f(t)); grid on   % 绘图
     engine.start(FS.files);
     Console.input.focus();
   }
-  ML.App = { Console, Editor, Files, Figures, Workspace, engine };
+  // 以捕获输出的方式运行代码（供 AI 助手使用）：返回 {output, error, figures, elapsed, cancelled}
+  function runCapture(code, echoText) {
+    return new Promise((resolve) => {
+      Console.echo(echoText || code);
+      engine.run(code, { source: 'ai', capture: true, onDone: resolve });
+    });
+  }
+  function showTool(name) {
+    const tab = document.querySelector('#toolTabs .tab[data-tool="' + name + '"]');
+    if (tab) tab.click();
+  }
+  ML.App = { Console, Editor, Files, Figures, Workspace, engine, FS, runCapture, showTool, status };
   boot();
 })(typeof self !== 'undefined' ? self : globalThis);

@@ -7,6 +7,8 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.cache === 'only-if-cached' && req.mode !== 'same-origin') return;
+  // 跨源请求（CDN 上的 SDK、Anthropic API）直接放行，不做改写
+  if (new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(fetch(req).then((res) => {
     if (res.status === 0) return res;
     const headers = new Headers(res.headers);
