@@ -2,7 +2,7 @@
 
 在浏览器中运行的 MATLAB 风格计算平台：自带 MATLAB 语言解释器、600 多个内置函数、绘图引擎和常用公式库，**纯前端、零依赖、无需安装**。
 
-**在线使用：<https://liyucheng1997.github.io/MatWeb/>**
+**在线使用：<https://liyucheng1997.github.io/376_lab-matlab-AI/>**
 
 ## 快速开始
 
